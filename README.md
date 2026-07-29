@@ -1,5 +1,9 @@
 # chip-logic-scope — a graphical 8-channel logic analyzer for Wokwi
 
+[![build](https://github.com/giltal/Wokwi-graphical-logic-analyzer/actions/workflows/build.yml/badge.svg)](https://github.com/giltal/Wokwi-graphical-logic-analyzer/actions/workflows/build.yml)
+[![release](https://img.shields.io/github/v/release/giltal/Wokwi-graphical-logic-analyzer)](https://github.com/giltal/Wokwi-graphical-logic-analyzer/releases/latest)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A Wokwi **custom chip** that behaves like a benchtop logic analyzer: eight digital inputs, a
 480 × 320 screen **on the part itself**, live waveforms, a real trigger, cursors, automatic
 measurements and protocol decoders for **UART, I2C and SPI**.
