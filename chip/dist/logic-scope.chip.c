@@ -1454,6 +1454,9 @@ static bool g_config_dirty;
 static uint64_t g_config_change_ns;
 static uint32_t g_last_timebase = 0xFFFFFFFFu;
 
+/* How long the sliders must sit still (simulated) before the block is dumped. */
+#define CONFIG_SETTLE_NS 500000000ull
+
 static void config_touched(uint64_t now) {
   g_config_dirty = true;
   g_config_change_ns = now;
@@ -2001,7 +2004,9 @@ static void render(void *user_data) {
   const uint64_t ns_per_px = tb->ns_per_div / DIV_W;
   const uint64_t window_ns = ns_per_px * (uint64_t)PLOT_W;
 
+  const bool was_running = g_scope.running;
   g_scope.running = attr_read(g_scope.attr_running) != 0u;
+  const bool just_stopped = was_running && !g_scope.running;
   update_trigger_config();
   update_sweep(now, window_ns);
 
@@ -2066,7 +2071,8 @@ static void render(void *user_data) {
   render_flush();
 
   /* Once the sliders have been still for a while, offer the config for reuse. */
-  if (g_config_dirty && now - g_config_change_ns >= MENU_HOLD_NS) {
+  if (g_config_dirty &&
+      (just_stopped || now - g_config_change_ns >= CONFIG_SETTLE_NS)) {
     g_config_dirty = false;
     print_config(tb_index);
   }
@@ -2142,5 +2148,9 @@ void chip_init(void) {
 
   printf("[logic-scope] ready: %dx%d, %d ch, ring %d events, %u Hz refresh\n",
          SCREEN_W, SCREEN_H, SCOPE_CHANNELS, SCOPE_MAX_EVENTS, refresh_hz);
+  printf(
+      "[logic-scope] slider settings are not saved: after every change the "
+      "chip prints an \"attrs\" block here - paste it into this part in "
+      "diagram.json to make it the startup setup\n");
 }
 

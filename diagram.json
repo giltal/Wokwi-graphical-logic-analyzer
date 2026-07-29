@@ -17,14 +17,27 @@
       "left": 200,
       "attrs": {
         "refreshHz": "20",
+        "timebaseIndex": "9",
+        "running": "1",
+        "cursorPos": "25",
+        "cursorPosB": "75",
+        "triggerMode": "0",
+        "triggerChannel": "0",
+        "triggerEdge": "0",
+        "preTriggerPercent": "25",
+        "channelMask": "255",
+        "measureChannel": "0",
         "decoder": "1",
         "decoderCh0": "7",
         "decoderCh1": "6",
         "decoderCh2": "4",
+        "uartBaudIndex": "0",
         "uartBaud": "9600",
         "uartBits": "8",
         "uartParity": "0",
-        "uartStop": "1"
+        "uartStop": "1",
+        "spiMode": "0",
+        "spiMsbFirst": "1"
       }
     },
     {
