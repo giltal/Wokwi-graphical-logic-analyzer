@@ -14,3 +14,6 @@ wokwi.vcd
 
 # Editor
 .vscode/settings.json
+
+# Local-only helper scripts
+*.local.ps1
