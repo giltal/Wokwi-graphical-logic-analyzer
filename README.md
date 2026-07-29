@@ -12,21 +12,7 @@ Wokwi's built-in `wokwi-logic-analyzer` only dumps a `.vcd` file when the run en
 draws the signals **while the simulation is running**, inside the diagram, with no external
 viewer.
 
-```
-+----------------------------------------------------------+
-| RUN  100us/div  win 900us  T D7 rise edge 25%  ev 8421 …  |
-+------+---------------------------------------------------+
-| D0 1 |  ▔▔▔|___|▔▔▔▔▔▔▔|________|▔▔▔▔                     |
-| D1 0 |  ...                                               |
-| ...  |                                                    |
-| D7 1 |                                                    |
-+------+---------------------------------------------------+
-| UART |  [48 'H'][65 'e'][6C 'l'][6C 'l'][6F 'o']          |
-+------+---------------------------------------------------+
-| A 25% B 75%  dt 450us  1/dt 2.22kHz   D3 H              |
-| D0  f 5.00kHz  T 200us  duty 50%  min 100us  edges 42     |
-+----------------------------------------------------------+
-```
+![chip-logic-scope running in Wokwi: eight live waveforms, cursors, measurements and an I2C decode lane, next to an ESP32-S3 driving an SSD1306 display and a DS1307 RTC](demo.png)
 
 ---
 
@@ -309,6 +295,12 @@ many more or far fewer wall-clock frames depending on how fast the simulation ru
 | Plot | `x 28–477`, `y 20–291` | 9 divisions × 50 px; lanes share the height |
 | Decode lane | bottom 26 px of the plot | annotation boxes (only when a decoder is active) |
 | Info bar | `y 295` / `y 305` | cursors, Δt, 1/Δt · auto-measurements |
+
+In the screenshot at the top of this page the status bar reads
+`ARM 100us/div win 900.00us T D2↑ edge 72% ev 459074 buf 32768 I2C D0/D1`: armed on a rising
+edge of D2 with 72 % pre-trigger, and the I2C decoder running on D0/D1 — its `S`, address,
+`W`, data and `P` boxes are in the decode lane. The two info rows below show cursor A at
+224 µs, cursor B at 672 µs, Δt = 448 µs (2.232 kHz) and the auto-measurements of D0.
 
 ---
 
