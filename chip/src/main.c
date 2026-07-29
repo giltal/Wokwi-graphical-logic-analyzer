@@ -229,13 +229,27 @@ static uint64_t g_menu_shown_ns;
 /*
  * Settings edited with the sliders live in RAM only: the chip API can read
  * attributes but never write them back, so restarting the simulation reloads
- * every setting from diagram.json. Once the configuration settles it is
- * therefore printed to the Chips Console as a paste-ready `attrs` block, which
- * is the only way to make a setup permanent.
+ * every setting from diagram.json. Once the configuration settles the whole
+ * menu is therefore packed into a couple of plain integers and printed to the
+ * Chips Console; pasting them back as `setup0`/`setup1` attributes is the only
+ * way to make a setup permanent.
+ *
+ * Field widths come from `kSettings[].max`, so adding a row to that table
+ * extends the layout by itself. Bump SETUP_WORDS when it no longer fits -
+ * chip_init() says so on the console.
  */
+#define SETUP_WORDS 2
+#define SETUP_BITS (SETUP_WORDS * 32u)
+
+static const char *const kSetupAttrNames[] = {
+    "setup0", "setup1", "setup2", "setup3",
+};
+
 static bool g_config_dirty;
 static uint64_t g_config_change_ns;
-static uint32_t g_last_timebase = 0xFFFFFFFFu;
+static uint32_t g_setup_attr[SETUP_WORDS];
+static uint32_t g_timebase = TIMEBASE_DEFAULT; /* effective time/div */
+static uint32_t g_timebase_raw;                /* last seen slider position */
 
 /* How long the sliders must sit still (simulated) before the block is dumped. */
 #define CONFIG_SETTLE_NS 500000000ull
@@ -243,6 +257,84 @@ static uint32_t g_last_timebase = 0xFFFFFFFFu;
 static void config_touched(uint64_t now) {
   g_config_dirty = true;
   g_config_change_ns = now;
+}
+
+/* ---------------------------------------------------------- setup words -- */
+
+static uint32_t bits_for(uint32_t max) {
+  uint32_t n = 1u;
+  while ((max >> n) != 0u) {
+    n++;
+  }
+  return n;
+}
+
+typedef struct {
+  uint32_t word[SETUP_WORDS];
+  uint32_t bit;
+} setup_bits_t;
+
+static void setup_put(setup_bits_t *s, uint32_t value, uint32_t width) {
+  for (uint32_t i = 0; i < width && s->bit < SETUP_BITS; i++, s->bit++) {
+    if (value & (1u << i)) {
+      s->word[s->bit >> 5] |= 1u << (s->bit & 31u);
+    }
+  }
+}
+
+static uint32_t setup_get(setup_bits_t *s, uint32_t width) {
+  uint32_t v = 0;
+  for (uint32_t i = 0; i < width && s->bit < SETUP_BITS; i++, s->bit++) {
+    if (s->word[s->bit >> 5] & (1u << (s->bit & 31u))) {
+      v |= 1u << i;
+    }
+  }
+  return v;
+}
+
+static uint32_t setup_layout_bits(void) {
+  uint32_t bits = bits_for((uint32_t)TIMEBASE_COUNT - 1u);
+  for (int i = 0; i < SETTING_COUNT; i++) {
+    bits += bits_for(kSettings[i].max);
+  }
+  return bits;
+}
+
+static void setup_pack(uint32_t timebase_index, uint32_t *out) {
+  setup_bits_t s;
+  for (int i = 0; i < SETUP_WORDS; i++) {
+    s.word[i] = 0;
+  }
+  s.bit = 0;
+  setup_put(&s, timebase_index, bits_for((uint32_t)TIMEBASE_COUNT - 1u));
+  for (int i = 0; i < SETTING_COUNT; i++) {
+    setup_put(&s, g_setting[i], bits_for(kSettings[i].max));
+  }
+  for (int i = 0; i < SETUP_WORDS; i++) {
+    out[i] = s.word[i];
+  }
+}
+
+/* All-zero words mean "not set": the individual attributes then stay in force. */
+static bool setup_unpack(const uint32_t *in, uint32_t *timebase_index) {
+  setup_bits_t s;
+  uint32_t any = 0;
+  for (int i = 0; i < SETUP_WORDS; i++) {
+    s.word[i] = in[i];
+    any |= in[i];
+  }
+  if (any == 0u) {
+    return false;
+  }
+  s.bit = 0;
+  const uint32_t tb = setup_get(&s, bits_for((uint32_t)TIMEBASE_COUNT - 1u));
+  *timebase_index =
+      (tb >= (uint32_t)TIMEBASE_COUNT) ? (uint32_t)TIMEBASE_COUNT - 1u : tb;
+  for (int i = 0; i < SETTING_COUNT; i++) {
+    const uint32_t v = setup_get(&s, bits_for(kSettings[i].max));
+    g_setting[i] = (v > kSettings[i].max) ? kSettings[i].max : v;
+  }
+  return true;
 }
 
 static void update_menu(uint64_t now) {
@@ -663,25 +755,27 @@ static void draw_menu(void) {
           COL_TEXT_DIM, 1);
 }
 
-/* Dumps the whole configuration as a diagram.json "attrs" block. */
+/* Dumps the whole configuration as the handful of integers that restore it. */
 static void print_config(uint32_t timebase_index) {
-  char line[640];
+  uint32_t words[SETUP_WORDS];
+  setup_pack(timebase_index, words);
+
+  char line[128];
   char *p = line;
-  p = str_append(p, "  \"attrs\": { \"timebaseIndex\": \"");
-  p = u32_append(p, timebase_index);
-  *p++ = '"';
-  for (int i = 0; i < SETTING_COUNT; i++) {
-    p = str_append(p, ", \"");
-    p = str_append(p, kSettings[i].attr);
+  for (int i = 0; i < SETUP_WORDS; i++) {
+    if (i != 0) {
+      p = str_append(p, ", ");
+    }
+    *p++ = '"';
+    p = str_append(p, kSetupAttrNames[i]);
     p = str_append(p, "\": \"");
-    p = u32_append(p, g_setting[i]);
+    p = u32_append(p, words[i]);
     *p++ = '"';
   }
-  p = str_append(p, " }");
   *p = '\0';
   printf(
-      "[logic-scope] settings reset on restart; paste this into the part in "
-      "diagram.json to keep them:\n%s\n",
+      "[logic-scope] setup changed; to keep it, add these attrs to this part "
+      "in diagram.json:\n  %s\n",
       line);
   fflush(stdout);
 }
@@ -774,15 +868,16 @@ static void render(void *user_data) {
   const uint64_t now = get_sim_nanos();
   update_menu(now);
 
-  uint32_t tb_index = attr_read(g_scope.attr_timebase);
+  /* Catch-up, as for the menu: the packed setup holds until the slider moves. */
+  const uint32_t tb_raw = attr_read(g_scope.attr_timebase);
+  if (tb_raw != g_timebase_raw) {
+    g_timebase_raw = tb_raw;
+    g_timebase = tb_raw;
+    config_touched(now);
+  }
+  uint32_t tb_index = g_timebase;
   if (tb_index >= (uint32_t)TIMEBASE_COUNT) {
     tb_index = (uint32_t)TIMEBASE_COUNT - 1u;
-  }
-  if (tb_index != g_last_timebase) {
-    if (g_last_timebase != 0xFFFFFFFFu) {
-      config_touched(now);
-    }
-    g_last_timebase = tb_index;
   }
   const timebase_t *tb = &kTimebases[tb_index];
   const uint64_t ns_per_px = tb->ns_per_div / DIV_W;
@@ -912,6 +1007,19 @@ void chip_init(void) {
     const uint32_t v = attr_read(g_setting_attr[i]);
     g_setting[i] = (v > kSettings[i].max) ? kSettings[i].max : v;
   }
+
+  /* `setup0`/`setup1` carry the same menu in packed form and win when present. */
+  uint32_t setup[SETUP_WORDS];
+  for (int i = 0; i < SETUP_WORDS; i++) {
+    g_setup_attr[i] = attr_init(kSetupAttrNames[i], 0);
+  }
+  for (int i = 0; i < SETUP_WORDS; i++) {
+    setup[i] = attr_read(g_setup_attr[i]);
+  }
+  g_timebase_raw = attr_read(g_scope.attr_timebase);
+  g_timebase = g_timebase_raw;
+  const bool packed = setup_unpack(setup, &g_timebase);
+
   g_menu_index = attr_read(g_scope.attr_setting_index);
   if (g_menu_index >= (uint32_t)SETTING_COUNT) {
     g_menu_index = (uint32_t)SETTING_COUNT - 1u;
@@ -937,7 +1045,12 @@ void chip_init(void) {
   printf("[logic-scope] ready: %dx%d, %d ch, ring %d events, %u Hz refresh\n",
          SCREEN_W, SCREEN_H, SCOPE_CHANNELS, SCOPE_MAX_EVENTS, refresh_hz);
   printf(
-      "[logic-scope] slider settings are not saved: after every change the "
-      "chip prints an \"attrs\" block here - paste it into this part in "
-      "diagram.json to make it the startup setup\n");
+      "[logic-scope] setup loaded from %s; slider edits are not saved, but the "
+      "chip prints a \"setup0\"/\"setup1\" pair here after every change - put "
+      "it in this part's attrs to make it the startup setup\n",
+      packed ? "setup0/setup1" : "the individual attributes");
+  if (setup_layout_bits() > SETUP_BITS) {
+    printf("[logic-scope] setup layout needs %u bits: bump SETUP_WORDS\n",
+           setup_layout_bits());
+  }
 }

@@ -401,10 +401,20 @@ everything. **Adding a parameter = one row in `kSettings` + bumping `settingInde
 in `chip.json`.**
 
 There is **no `attr_write`** in the API, so nothing edited with the sliders survives a restart:
-`chip_init()` reloads every setting from `diagram.json`. Instead, `MENU_HOLD_NS` after the last
-slider movement `print_config()` dumps the whole configuration to the Chips Console as a
-paste-ready `"attrs": { … }` block (including `timebaseIndex`), which is the only way to make a
-setup permanent. The menu overlay carries the same hint in its footer.
+`chip_init()` reloads every setting from `diagram.json`. Instead, `CONFIG_SETTLE_NS` (0.5 s of
+simulated time) after the last slider movement — or immediately on Run → Stop — `print_config()`
+packs the whole menu into `SETUP_WORDS` (2) integers and prints them to the Chips Console as
+`"setup0": "…", "setup1": "…"`. Pasting that pair into the part's `attrs` is the only way to make
+a setup permanent. The menu overlay carries the same hint in its footer, and `chip_init()`
+reports which source it loaded from.
+
+`setup_pack()`/`setup_unpack()` walk `timebaseIndex` + all of `kSettings[]` bit by bit, taking
+each field's width from `bits_for(max)` — 63 bits today — so **adding a setting extends the
+layout automatically**; `chip_init()` prints `setup layout needs N bits: bump SETUP_WORDS` if it
+stops fitting (and `kSetupAttrNames[]` already has four names ready). All-zero words mean *not
+set*, in which case the individual attributes stay in force; when present they override them.
+`timebaseIndex` is both a control and a packed field, so it uses the same catch-up rule as the
+menu: the packed value holds until the slider actually moves.
 
 ### Phase 4 — Protocol decoders
 - [x] `decoder.h` interface + annotation list + annotation lane renderer.

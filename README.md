@@ -121,19 +121,53 @@ overwrites it — only actually moving `Value` writes.
 
 ### Keeping a setup across restarts
 
-The chip API can read attributes but never write them back, so everything you dial in with the
-sliders lives in RAM and is reloaded from `diagram.json` when the simulation restarts.
+The chip API can read attributes but never write them back (there is no `attrWrite`, and a chip
+cannot touch the project files), so everything you dial in with the sliders lives in RAM and is
+reloaded from `diagram.json` when the simulation restarts.
 
-A few seconds after you stop moving the sliders the chip prints the complete configuration to
-the **Chips Console** as a ready-to-paste block:
+Half a second after you stop moving the sliders — or as soon as you press **Stop** — the chip
+packs the whole menu into two integers and prints them to the **Chips Console**:
 
 ```
-[logic-scope] settings reset on restart; paste this into the part in diagram.json to keep them:
-  "attrs": { "timebaseIndex": "9", "cursorPos": "25", "cursorPosB": "75", … }
+[logic-scope] setup changed; to keep it, add these attrs to this part in diagram.json:
+  "setup0": "2148540697", "setup1": "8489"
 ```
 
-Paste it into the `chip-logic-scope` part in `diagram.json` (replacing its `attrs`) and the setup
-becomes the new startup state.
+Copy that line into the `chip-logic-scope` part in `diagram.json`:
+
+```jsonc
+{
+  "type": "chip-logic-scope",
+  "id": "scope1",
+  "top": 0, "left": 0,
+  "attrs": { "setup0": "2148540697", "setup1": "8489" }
+}
+```
+
+Restart the simulation and the scope comes up exactly as you left it. On startup the chip
+confirms which source it used:
+
+```
+[logic-scope] setup loaded from setup0/setup1; slider edits are not saved, but the chip prints …
+```
+
+**How it works.** `setup0`/`setup1` are a bit-packed copy of `timebaseIndex` plus all 15 menu
+settings (63 bits in total), with each field only as wide as its own range. There is nothing
+magic about them:
+
+- they are **optional** — if both are absent or `0`, the individual attributes below are used;
+- when present they **override** every individual attribute they cover, so you can keep a
+  readable `attrs` block for documentation and one `setup0`/`setup1` pair for the actual state;
+- they do **not** cover `uartBaud`, `uartBits`, `uartParity`, `uartStop` or `refreshHz`, which
+  are not in the menu and stay as ordinary attributes;
+- the `Time/div` slider still wins the moment you move it, so a packed timebase is a starting
+  point and not a lock;
+- they are opaque on purpose. Edit a setup by loading it, moving the sliders and copying the new
+  pair — do not try to compute one by hand.
+
+> The layout is derived from the settings table in [chip/src/main.c](chip/src/main.c), so it can
+> change between chip versions. Words written by one version are only guaranteed to be read back
+> by the same version.
 
 ---
 
@@ -259,6 +293,7 @@ are strings, as always in `diagram.json`.
 | `spiMode` | `0` | 0–3 (CPOL = mode >> 1, CPHA = mode & 1) |
 | `spiMsbFirst` | `1` | 0 = LSB first, 1 = MSB first |
 | `refreshHz` | `20` | redraw rate, in **simulated** time |
+| `setup0` / `setup1` | `0` / `0` | packed copy of the whole menu, printed by the chip — see [Keeping a setup across restarts](#keeping-a-setup-across-restarts). Overrides every attribute above except `uartBaud`/`uartBits`/`uartParity`/`uartStop`/`refreshHz` |
 
 `refreshHz` is a simulated-time rate: 20 means 20 frames per simulated second, which may be
 many more or far fewer wall-clock frames depending on how fast the simulation runs.
