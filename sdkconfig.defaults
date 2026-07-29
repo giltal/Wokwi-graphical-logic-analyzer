@@ -1,0 +1,5 @@
+# Keep the ESP32-S3 console on UART0 so it maps to the TX/RX pins in diagram.json.
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+
+# The signal generator task spins tightly; don't let the task WDT trip.
+CONFIG_ESP_TASK_WDT_INIT=n

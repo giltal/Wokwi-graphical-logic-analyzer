@@ -1,0 +1,10 @@
+[wokwi]
+version = 1
+firmware = 'build/flasher_args.json'
+elf = 'build/logic-scope-demo.elf'
+
+# Custom chip: available in diagram.json as part type "chip-logic-scope".
+# Wokwi also loads chip/dist/logic-scope.chip.json (same base name as the wasm).
+[[chip]]
+name = 'logic-scope'
+binary = 'chip/dist/logic-scope.chip.wasm'

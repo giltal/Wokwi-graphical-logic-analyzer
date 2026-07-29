@@ -1,0 +1,54 @@
+{
+  "name": "Logic Scope (8ch)",
+  "author": "Gil Tal",
+  "pins": [
+    "GND",
+    "VCC",
+    "D0",
+    "D1",
+    "D2",
+    "D3",
+    "D4",
+    "D5",
+    "D6",
+    "D7"
+  ],
+  "display": {
+    "width": 480,
+    "height": 320
+  },
+  "controls": [
+    {
+      "id": "timebaseIndex",
+      "label": "Time/div",
+      "type": "range",
+      "min": 0,
+      "max": 15,
+      "step": 1
+    },
+    {
+      "id": "running",
+      "label": "Run 0stop 1run",
+      "type": "range",
+      "min": 0,
+      "max": 1,
+      "step": 1
+    },
+    {
+      "id": "settingIndex",
+      "label": "Setting",
+      "type": "range",
+      "min": 0,
+      "max": 14,
+      "step": 1
+    },
+    {
+      "id": "settingValue",
+      "label": "Value",
+      "type": "range",
+      "min": 0,
+      "max": 255,
+      "step": 1
+    }
+  ]
+}

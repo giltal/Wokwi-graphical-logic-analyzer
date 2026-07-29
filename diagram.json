@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "author": "Gil Tal",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-s3-devkitc-1",
+      "id": "esp",
+      "top": 0,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "chip-logic-scope",
+      "id": "scope",
+      "top": -20,
+      "left": 200,
+      "attrs": {
+        "refreshHz": "20",
+        "decoder": "1",
+        "decoderCh0": "7",
+        "decoderCh1": "6",
+        "decoderCh2": "4",
+        "uartBaud": "9600",
+        "uartBits": "8",
+        "uartParity": "0",
+        "uartStop": "1"
+      }
+    },
+    {
+      "type": "wokwi-mpu6050",
+      "id": "imu",
+      "top": 250,
+      "left": -60,
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    ["esp:TX", "$serialMonitor:RX", "", []],
+    ["esp:RX", "$serialMonitor:TX", "", []],
+
+    ["esp:4", "scope:D0", "red", []],
+    ["esp:5", "scope:D1", "orange", []],
+    ["esp:6", "scope:D2", "yellow", []],
+    ["esp:7", "scope:D3", "green", []],
+    ["esp:15", "scope:D4", "cyan", []],
+    ["esp:16", "scope:D5", "blue", []],
+    ["esp:17", "scope:D6", "purple", []],
+    ["esp:18", "scope:D7", "magenta", []],
+
+    ["esp:GND.1", "scope:GND", "black", []],
+    ["esp:3V3.1", "scope:VCC", "red", []],
+
+    ["esp:16", "imu:SDA", "green", []],
+    ["esp:17", "imu:SCL", "green", []],
+    ["imu:VCC", "esp:3V3.1", "red", []],
+    ["imu:GND", "esp:GND.1", "black", []]
+  ],
+  "dependencies": {}
+}
