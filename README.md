@@ -119,6 +119,22 @@ overwrites it — only actually moving `Value` writes.
 | 13 | SPI mode | 0–3 |
 | 14 | SPI order | `LSB` · `MSB` |
 
+### Keeping a setup across restarts
+
+The chip API can read attributes but never write them back, so everything you dial in with the
+sliders lives in RAM and is reloaded from `diagram.json` when the simulation restarts.
+
+A few seconds after you stop moving the sliders the chip prints the complete configuration to
+the **Chips Console** as a ready-to-paste block:
+
+```
+[logic-scope] settings reset on restart; paste this into the part in diagram.json to keep them:
+  "attrs": { "timebaseIndex": "9", "cursorPos": "25", "cursorPosB": "75", … }
+```
+
+Paste it into the `chip-logic-scope` part in `diagram.json` (replacing its `attrs`) and the setup
+becomes the new startup state.
+
 ---
 
 ## Timebase

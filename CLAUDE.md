@@ -400,6 +400,12 @@ The table lives in `kSettings[]` in `main.c` (`name`, `attr`, `max`, `def`, opti
 everything. **Adding a parameter = one row in `kSettings` + bumping `settingIndex`'s `max`
 in `chip.json`.**
 
+There is **no `attr_write`** in the API, so nothing edited with the sliders survives a restart:
+`chip_init()` reloads every setting from `diagram.json`. Instead, `MENU_HOLD_NS` after the last
+slider movement `print_config()` dumps the whole configuration to the Chips Console as a
+paste-ready `"attrs": { … }` block (including `timebaseIndex`), which is the only way to make a
+setup permanent. The menu overlay carries the same hint in its footer.
+
 ### Phase 4 — Protocol decoders
 - [x] `decoder.h` interface + annotation list + annotation lane renderer.
 - [x] UART decoder (baud, data bits, parity, stop bits; ASCII + hex display).

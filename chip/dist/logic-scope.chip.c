@@ -1443,6 +1443,22 @@ static uint32_t g_menu_index;
 static uint32_t g_menu_raw;
 static uint64_t g_menu_shown_ns;
 
+/*
+ * Settings edited with the sliders live in RAM only: the chip API can read
+ * attributes but never write them back, so restarting the simulation reloads
+ * every setting from diagram.json. Once the configuration settles it is
+ * therefore printed to the Chips Console as a paste-ready `attrs` block, which
+ * is the only way to make a setup permanent.
+ */
+static bool g_config_dirty;
+static uint64_t g_config_change_ns;
+static uint32_t g_last_timebase = 0xFFFFFFFFu;
+
+static void config_touched(uint64_t now) {
+  g_config_dirty = true;
+  g_config_change_ns = now;
+}
+
 static void update_menu(uint64_t now) {
   uint32_t index = attr_read(g_scope.attr_setting_index);
   if (index >= (uint32_t)SETTING_COUNT) {
@@ -1459,6 +1475,7 @@ static void update_menu(uint64_t now) {
     const uint32_t max = kSettings[index].max;
     g_setting[index] = (raw * max + SETTING_RAW_MAX / 2u) / SETTING_RAW_MAX;
     g_menu_shown_ns = now;
+    config_touched(now);
   }
 }
 
@@ -1821,7 +1838,7 @@ static void draw_decode_lane(uint8_t decoder_id, uint64_t view_start,
 
 static void draw_menu(void) {
   const int w = MENU_COLS * MENU_CELL_W + 10;
-  const int h = MENU_ROWS * MENU_ROW_H + 18;
+  const int h = MENU_ROWS * MENU_ROW_H + 30;
   const int x = PLOT_X + (PLOT_W - w) / 2;
   const int y = LANE_TOP + 24;
 
@@ -1854,6 +1871,32 @@ static void draw_menu(void) {
     const int vw = fb_text_width(value, 1);
     fb_text(cx + MENU_CELL_W - 10 - vw, cy, value, color, 1);
   }
+
+  fb_hline(x + 1, y + h - 13, w - 2, COL_FRAME);
+  fb_text(x + 5, y + h - 10, "lost on restart: see the Chips Console",
+          COL_TEXT_DIM, 1);
+}
+
+/* Dumps the whole configuration as a diagram.json "attrs" block. */
+static void print_config(uint32_t timebase_index) {
+  char line[640];
+  char *p = line;
+  p = str_append(p, "  \"attrs\": { \"timebaseIndex\": \"");
+  p = u32_append(p, timebase_index);
+  *p++ = '"';
+  for (int i = 0; i < SETTING_COUNT; i++) {
+    p = str_append(p, ", \"");
+    p = str_append(p, kSettings[i].attr);
+    p = str_append(p, "\": \"");
+    p = u32_append(p, g_setting[i]);
+    *p++ = '"';
+  }
+  p = str_append(p, " }");
+  *p = '\0';
+  printf(
+      "[logic-scope] settings reset on restart; paste this into the part in "
+      "diagram.json to keep them:\n%s\n",
+      line);
 }
 
 /* ---------------------------------------------------------------- sweep -- */
@@ -1948,6 +1991,12 @@ static void render(void *user_data) {
   if (tb_index >= (uint32_t)TIMEBASE_COUNT) {
     tb_index = (uint32_t)TIMEBASE_COUNT - 1u;
   }
+  if (tb_index != g_last_timebase) {
+    if (g_last_timebase != 0xFFFFFFFFu) {
+      config_touched(now);
+    }
+    g_last_timebase = tb_index;
+  }
   const timebase_t *tb = &kTimebases[tb_index];
   const uint64_t ns_per_px = tb->ns_per_div / DIV_W;
   const uint64_t window_ns = ns_per_px * (uint64_t)PLOT_W;
@@ -2015,6 +2064,12 @@ static void render(void *user_data) {
     draw_menu();
   }
   render_flush();
+
+  /* Once the sliders have been still for a while, offer the config for reuse. */
+  if (g_config_dirty && now - g_config_change_ns >= MENU_HOLD_NS) {
+    g_config_dirty = false;
+    print_config(tb_index);
+  }
 }
 
 /* ------------------------------------------------------------------ init -- */
