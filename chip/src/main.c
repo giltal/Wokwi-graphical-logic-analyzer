@@ -683,6 +683,7 @@ static void print_config(uint32_t timebase_index) {
       "[logic-scope] settings reset on restart; paste this into the part in "
       "diagram.json to keep them:\n%s\n",
       line);
+  fflush(stdout);
 }
 
 /* ---------------------------------------------------------------- sweep -- */
@@ -864,6 +865,10 @@ static void render(void *user_data) {
 /* ------------------------------------------------------------------ init -- */
 
 void chip_init(void) {
+  /* Some wasi-libc builds fully buffer stdout; a chip never exits, so an
+   * unflushed buffer would simply never reach the Chips Console. */
+  setvbuf(stdout, NULL, _IONBF, 0);
+
   if (!render_init()) {
     return;
   }
