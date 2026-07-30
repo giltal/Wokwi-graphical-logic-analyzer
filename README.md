@@ -29,6 +29,7 @@ viewer.
 - **Channel mask** with adaptive lane height, per-channel colors
 - **On-screen settings menu**, so the whole feature set is reachable from four sliders
 - Pure C11, no allocation after init, ~160 KB of wasm
+- Project on Wokwi to see it in action: https://wokwi.com/projects/445513049908390913
 
 ---
 
